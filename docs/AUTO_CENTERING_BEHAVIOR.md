@@ -210,6 +210,12 @@ Force
 
 **Meaning**: The strongest force the centering system can apply when you're far from target.
 
+**⚠️ IMPORTANT**: This parameter affects **BOTH** modes:
+- **`auto_centering: true`**: Controls centering force everywhere
+- **`auto_centering: false`**: Controls braking force in brake zone (near target)
+
+Even with `auto_centering: false`, increasing this value will make braking stronger!
+
 #### Effect of Changing Values
 
 | Value | Force (Nm) | Feel | Use Case |
@@ -598,7 +604,22 @@ auto_centering_max_position: 0.3
 
 ---
 
-### Q2: Do brake parameters affect `auto_centering: true` mode?
+### Q2: Do auto-centering parameters affect `auto_centering: false` mode?
+
+**Answer**: **YES! This is important!**
+
+When `auto_centering: false`, the system **still uses auto-centering parameters in the brake zone**:
+- Once you enter the brake zone (within `brake_position` of target), it calls `calcCenteringForce()`
+- This function uses `auto_centering_max_torque` and `auto_centering_max_position`
+- So changing `auto_centering_max_torque` from 0.3 → 0.8 will make braking **much stronger**!
+
+**What this means**:
+- `auto_centering_max_torque` = Your **brake force strength** in manual control mode
+- `auto_centering_max_position` = Your **brake force curve** in manual control mode
+
+---
+
+### Q2b: Do brake parameters affect `auto_centering: true` mode?
 
 **Answer**: **NO**. When `auto_centering: true`:
 - `brake_torque` and `brake_position` are **completely ignored**
@@ -699,7 +720,7 @@ The difference is **when/where** it's applied, not the force calculation itself.
 1. **Auto-centering has two modes**: Always-on centering vs. brake-zone-only centering
 2. **Same force function, different triggers**: Both modes use `calcCenteringForce()`
 3. **Target position**: Centers to 0° by default or last ROS command
-4. **Parameter independence**: Brake parameters don't affect `auto_centering: true`
+4. **Parameter overlap**: `auto_centering_max_torque` affects braking in BOTH modes!
 5. **Force curve control**: `max_position` determines steepness, `max_torque` determines strength
 
 ### Quick Reference

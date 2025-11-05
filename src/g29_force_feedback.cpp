@@ -101,7 +101,7 @@ G29ForceFeedback::~G29ForceFeedback() {
     m_effect.direction = 0;
     // upload m_effect
     if (ioctl(m_device_handle, EVIOCSFF, &m_effect) < 0) {
-        std::cout << "failed to upload m_effect" << std::endl;
+        RCLCPP_ERROR(this->get_logger(), "Failed to upload force effect during shutdown");
     }
 }
 
@@ -190,7 +190,7 @@ void G29ForceFeedback::uploadForce(const double &position,
 
     // upload effect
     if (ioctl(m_device_handle, EVIOCSFF, &m_effect) < 0) {
-        std::cout << "failed to upload effect" << std::endl;
+        RCLCPP_ERROR(this->get_logger(), "Failed to upload force effect");
     }
 }
 
@@ -221,43 +221,43 @@ void G29ForceFeedback::initDevice() {
 
     m_device_handle = open(m_device_name.c_str(), O_RDWR|O_NONBLOCK);
     if (m_device_handle < 0) {
-        std::cout << "ERROR: cannot open device : "<< m_device_name << std::endl;
+        RCLCPP_ERROR(this->get_logger(), "Cannot open device: %s", m_device_name.c_str());
         exit(1);
 
-    } else {std::cout << "device opened" << std::endl;}
+    } else {RCLCPP_INFO(this->get_logger(), "Device opened: %s", m_device_name.c_str());}
 
     // which axes has the device?
     memset(abs_bits, 0, sizeof(abs_bits));
     if (ioctl(m_device_handle, EVIOCGBIT(EV_ABS, sizeof(abs_bits)), abs_bits) < 0) {
-        std::cout << "ERROR: cannot get abs bits" << std::endl;
+        RCLCPP_ERROR(this->get_logger(), "Cannot get absolute axis bits");
         exit(1);
     }
 
     // get some information about force feedback
     memset(ff_bits, 0, sizeof(ff_bits));
     if (ioctl(m_device_handle, EVIOCGBIT(EV_FF, sizeof(ff_bits)), ff_bits) < 0) {
-        std::cout << "ERROR: cannot get ff bits" << std::endl;
+        RCLCPP_ERROR(this->get_logger(), "Cannot get force feedback capability bits");
         exit(1);
     }
 
     // get axis value range
     if (ioctl(m_device_handle, EVIOCGABS(m_axis_code), &abs_info) < 0) {
-        std::cout << "ERROR: cannot get axis range" << std::endl;
+        RCLCPP_ERROR(this->get_logger(), "Cannot get axis range");
         exit(1);
     }
     m_axis_max = abs_info.maximum;
     m_axis_min = abs_info.minimum;
     if (m_axis_min >= m_axis_max) {
-        std::cout << "ERROR: axis range has bad value" << std::endl;
+        RCLCPP_ERROR(this->get_logger(), "Axis range has invalid values (min: %d, max: %d)", m_axis_min, m_axis_max);
         exit(1);
     }
 
     // check force feedback is supported?
     if(!testBit(FF_CONSTANT, ff_bits)) {
-        std::cout << "ERROR: force feedback is not supported" << std::endl;
+        RCLCPP_ERROR(this->get_logger(), "Force feedback is not supported by device");
         exit(1);
 
-    } else { std::cout << "force feedback supported" << std::endl; }
+    } else { RCLCPP_INFO(this->get_logger(), "Force feedback supported"); }
 
     // auto centering off
     memset(&event, 0, sizeof(event));
@@ -265,7 +265,7 @@ void G29ForceFeedback::initDevice() {
     event.code = FF_AUTOCENTER;
     event.value = 0;
     if (write(m_device_handle, &event, sizeof(event)) != sizeof(event)) {
-        std::cout << "failed to disable auto centering" << std::endl;
+        RCLCPP_ERROR(this->get_logger(), "Failed to disable auto centering");
         exit(1);
     }
 
@@ -285,7 +285,7 @@ void G29ForceFeedback::initDevice() {
     m_effect.u.constant.envelope.fade_level = 0;
 
     if (ioctl(m_device_handle, EVIOCSFF, &m_effect) < 0) {
-        std::cout << "failed to upload m_effect" << std::endl;
+        RCLCPP_ERROR(this->get_logger(), "Failed to upload initial force effect");
         exit(1);
     }
 
@@ -295,7 +295,7 @@ void G29ForceFeedback::initDevice() {
     event.code = m_effect.id;
     event.value = 1;
     if (write(m_device_handle, &event, sizeof(event)) != sizeof(event)) {
-        std::cout << "failed to start event" << std::endl;
+        RCLCPP_ERROR(this->get_logger(), "Failed to start force effect");
         exit(1);
     }
 }

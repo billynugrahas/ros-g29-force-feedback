@@ -1,4 +1,6 @@
 #include <rclcpp/rclcpp.hpp>
+#include <rcl_interfaces/msg/set_parameters_result.hpp>
+#include <mutex>
 
 #include <linux/input.h>
 #include <sys/ioctl.h>
@@ -42,6 +44,12 @@ private:
     double m_torque;
     double m_attack_length;
 
+    // Thread safety for parameter updates
+    std::mutex m_param_mutex;
+
+    // Parameter callback handle
+    rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr m_param_callback_handle;
+
 public:
     G29ForceFeedback();
     ~G29ForceFeedback();
@@ -54,6 +62,7 @@ private:
     void calcRotateForce(double &torque, double &attack_length, const ros_g29_force_feedback::msg::ForceFeedback &target, const double &current_position);
     void calcCenteringForce(double &torque, const ros_g29_force_feedback::msg::ForceFeedback &target, const double &current_position);
     void uploadForce(const double &position, const double &force, const double &attack_length);
+    rcl_interfaces::msg::SetParametersResult parametersCallback(const std::vector<rclcpp::Parameter>& parameters);
 };
 
 
@@ -97,6 +106,12 @@ G29ForceFeedback::G29ForceFeedback()
     rclcpp::sleep_for(std::chrono::seconds(1));
     timer = this->create_wall_timer(std::chrono::milliseconds((int)(m_loop_rate*1000)), 
             std::bind(&G29ForceFeedback::loop,this));
+
+    // Register parameter callback for runtime reconfiguration
+    m_param_callback_handle = this->add_on_set_parameters_callback(
+        std::bind(&G29ForceFeedback::parametersCallback, this, std::placeholders::_1));
+
+    RCLCPP_INFO(this->get_logger(), "Dynamic parameter reconfiguration enabled for: max_torque, min_torque, brake_position, brake_torque, auto_centering_max_torque, auto_centering_max_position, eps, auto_centering");
 }
 
 G29ForceFeedback::~G29ForceFeedback() {
@@ -109,6 +124,205 @@ G29ForceFeedback::~G29ForceFeedback() {
     if (ioctl(m_device_handle, EVIOCSFF, &m_effect) < 0) {
         RCLCPP_ERROR(this->get_logger(), "Failed to upload force effect during shutdown");
     }
+}
+
+
+rcl_interfaces::msg::SetParametersResult G29ForceFeedback::parametersCallback(
+    const std::vector<rclcpp::Parameter>& parameters)
+{
+    rcl_interfaces::msg::SetParametersResult result;
+    result.successful = true;
+    result.reason = "";
+
+    // Lock mutex for thread-safe parameter updates
+    std::lock_guard<std::mutex> lock(m_param_mutex);
+
+    for (const auto & param : parameters)
+    {
+        const std::string param_name = param.get_name();
+
+        // Handle max_torque
+        if (param_name == "max_torque")
+        {
+            if (param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+                double new_value = param.as_double();
+                if (new_value < 0.0 || new_value > 1.0)
+                {
+                    result.successful = false;
+                    result.reason = "max_torque must be in range [0.0, 1.0]";
+                    RCLCPP_ERROR(this->get_logger(), "%s", result.reason.c_str());
+                }
+                else
+                {
+                    m_max_torque = new_value;
+                    RCLCPP_INFO(this->get_logger(), "max_torque updated to %.3f", new_value);
+                }
+            }
+        }
+        // Handle min_torque
+        else if (param_name == "min_torque")
+        {
+            if (param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+                double new_value = param.as_double();
+                if (new_value < 0.0 || new_value > 1.0)
+                {
+                    result.successful = false;
+                    result.reason = "min_torque must be in range [0.0, 1.0]";
+                    RCLCPP_ERROR(this->get_logger(), "%s", result.reason.c_str());
+                }
+                else
+                {
+                    m_min_torque = new_value;
+                    RCLCPP_INFO(this->get_logger(), "min_torque updated to %.3f", new_value);
+                }
+            }
+        }
+        // Handle brake_position
+        else if (param_name == "brake_position")
+        {
+            if (param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+                double new_value = param.as_double();
+                if (new_value < 0.0 || new_value > 1.0)
+                {
+                    result.successful = false;
+                    result.reason = "brake_position must be in range [0.0, 1.0]";
+                    RCLCPP_ERROR(this->get_logger(), "%s", result.reason.c_str());
+                }
+                else
+                {
+                    m_brake_position = new_value;
+                    RCLCPP_INFO(this->get_logger(), "brake_position updated to %.3f (%.1f degrees)",
+                               new_value, new_value * 450.0);
+                }
+            }
+        }
+        // Handle brake_torque
+        else if (param_name == "brake_torque")
+        {
+            if (param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+                double new_value = param.as_double();
+                if (new_value < 0.0 || new_value > 1.0)
+                {
+                    result.successful = false;
+                    result.reason = "brake_torque must be in range [0.0, 1.0]";
+                    RCLCPP_ERROR(this->get_logger(), "%s", result.reason.c_str());
+                }
+                else
+                {
+                    m_brake_torque = new_value;
+                    RCLCPP_INFO(this->get_logger(), "brake_torque updated to %.3f", new_value);
+                }
+            }
+        }
+        // Handle auto_centering_max_torque
+        else if (param_name == "auto_centering_max_torque")
+        {
+            if (param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+                double new_value = param.as_double();
+                if (new_value < 0.0 || new_value > 1.0)
+                {
+                    result.successful = false;
+                    result.reason = "auto_centering_max_torque must be in range [0.0, 1.0]";
+                    RCLCPP_ERROR(this->get_logger(), "%s", result.reason.c_str());
+                }
+                else
+                {
+                    m_auto_centering_max_torque = new_value;
+                    RCLCPP_INFO(this->get_logger(), "auto_centering_max_torque updated to %.3f", new_value);
+                }
+            }
+        }
+        // Handle auto_centering_max_position
+        else if (param_name == "auto_centering_max_position")
+        {
+            if (param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+                double new_value = param.as_double();
+                if (new_value < 0.0 || new_value > 1.0)
+                {
+                    result.successful = false;
+                    result.reason = "auto_centering_max_position must be in range [0.0, 1.0]";
+                    RCLCPP_ERROR(this->get_logger(), "%s", result.reason.c_str());
+                }
+                else
+                {
+                    m_auto_centering_max_position = new_value;
+                    RCLCPP_INFO(this->get_logger(), "auto_centering_max_position updated to %.3f (%.1f degrees)",
+                               new_value, new_value * 450.0);
+                }
+            }
+        }
+        // Handle eps (dead zone threshold)
+        else if (param_name == "eps")
+        {
+            if (param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+                double new_value = param.as_double();
+                if (new_value < 0.0 || new_value > 0.5)
+                {
+                    result.successful = false;
+                    result.reason = "eps must be in range [0.0, 0.5]";
+                    RCLCPP_ERROR(this->get_logger(), "%s", result.reason.c_str());
+                }
+                else
+                {
+                    m_eps = new_value;
+                    RCLCPP_INFO(this->get_logger(), "eps updated to %.4f (±%.1f degrees)",
+                               new_value, new_value * 450.0);
+                }
+            }
+        }
+        // Handle auto_centering mode
+        else if (param_name == "auto_centering")
+        {
+            if (param.get_type() == rclcpp::ParameterType::PARAMETER_BOOL)
+            {
+                bool new_value = param.as_bool();
+                m_auto_centering = new_value;
+                RCLCPP_INFO(this->get_logger(), "auto_centering %s",
+                           new_value ? "enabled" : "disabled");
+            }
+        }
+        // Static parameters - reject changes
+        else if (param_name == "device_name")
+        {
+            result.successful = false;
+            result.reason = "device_name is read-only (requires node restart to change)";
+            RCLCPP_WARN(this->get_logger(), "%s", result.reason.c_str());
+        }
+        else if (param_name == "input_topic")
+        {
+            result.successful = false;
+            result.reason = "input_topic is read-only (requires node restart to change)";
+            RCLCPP_WARN(this->get_logger(), "%s", result.reason.c_str());
+        }
+        else if (param_name == "loop_rate")
+        {
+            result.successful = false;
+            result.reason = "loop_rate is read-only (requires node restart to change)";
+            RCLCPP_WARN(this->get_logger(), "%s", result.reason.c_str());
+        }
+        else
+        {
+            // Unknown parameter
+            result.successful = false;
+            result.reason = "Unknown parameter: " + param_name;
+            RCLCPP_ERROR(this->get_logger(), "%s", result.reason.c_str());
+        }
+
+        // If any parameter failed, stop processing
+        if (!result.successful)
+        {
+            break;
+        }
+    }
+
+    return result;
 }
 
 

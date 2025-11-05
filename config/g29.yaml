@@ -1,12 +1,27 @@
 g29_force_feedback:
   ros__parameters:
-    device_name: "/dev/input/event13"
-    loop_rate: 0.1
-    max_torque: 1.0
-    min_torque: 0.2
-    brake_torque: 0.2
-    brake_position: 0.1
-    auto_centering_max_torque: 0.3
-    auto_centering_max_position: 0.2
-    eps: 0.05
-    auto_centering: false
+    # NOTE: G29 wheel range is -450° to +450° (900° total rotation)
+    # Position values are normalized: multiply by 450° to get actual degrees
+    # Example: position value 0.1 = 0.1 × 450° = 45°
+
+    # Device Configuration
+    device_name: "/dev/input/event25"  # Linux input event device path (find with: cat /proc/bus/input/devices | grep -iA4 logitech)
+
+    # Control Loop Timing
+    loop_rate: 0.1  # Control loop period in seconds (0.1 = 10Hz). Lower = more responsive but higher CPU usage
+
+    # Torque Limits
+    max_torque: 1.0  # Maximum torque safety limit (1.0 = 2.5 Nm). Published torque values are clamped to this value
+    min_torque: 0.2  # Minimum effective torque threshold (0.2 = 0.5 Nm). Below this, wheel won't rotate due to friction
+
+    # Braking System (prevents overshooting target position)
+    brake_torque: 0.2      # Braking force multiplier (0.0-1.0). Higher = stronger braking, less overshoot
+    brake_position: 0.1    # Distance from target where braking starts (0.1 × 450° = 45°). Higher = earlier braking
+
+    # Precision Control
+    eps: 0.02  # Dead zone threshold around target (0.02 × 450° = ±9°). Within this range, wheel is "at target" with zero torque
+
+    # Auto-Centering Configuration
+    auto_centering_max_torque: 0.3    # Max centering force at full displacement (also affects brake force in manual mode)
+    auto_centering_max_position: 0.2  # Distance where max centering torque is reached (0.2 × 450° = 90°). Controls force curve steepness
+    auto_centering: false  # Enable constant auto-centering (true) or manual ROS topic control (false)

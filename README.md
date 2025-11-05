@@ -39,10 +39,67 @@ This is useful for the user interface of autonomous driving, driving simulator l
 
 To check whether your kernel supports force feedback, do as follows
 ```bash
-$ cat /boot/config-5.3.0-46-generic | grep CONFIG_LOGIWHEELS_FF
+$ cat /boot/config-$(uname -r) | grep CONFIG_LOGIWHEELS_FF
 CONFIG_LOGIWHEELS_FF=y
-```  
+```
+This command uses `$(uname -r)` to automatically detect your current kernel version instead of hardcoding it.
 If you cannot get `CONFIG_LOGIWHEELS_FF=y`, try to find patch or use latest kernel...
+
+# Hardware Setup and Troubleshooting
+
+## 1. Check if Logitech Module is Loaded
+First, verify that the Logitech driver module is being used instead of the generic HID driver:
+```bash
+$ sudo dmesg -wH
+```
+Look for messages indicating that the `logitech` driver is being used. If you see `hid-generic` instead, continue with the following steps.
+
+## 2. Ensure G29 is in PS3 Mode
+**Important:** The G29 must be in PS3 mode to work properly with Linux. PS4 mode is currently not working on Ubuntu.
+
+Check the mode switch on the back of your wheel:
+- The switch should be set to **PS3** (not PS4 or PS5)
+- **Check the physical switch carefully:** In some cases, the switch mechanism can be broken internally. If you suspect this, you may need to open the device and verify the PCB is actually making contact in PS3 position. You might need to manually position the switch or repair the connection.
+
+## 3. Install Custom Linux Module (if still using hid-generic)
+If your G29 is still being detected as `hid-generic` even in PS3 mode, install the improved custom Linux module:
+
+```bash
+$ git clone https://github.com/berarma/new-lg4ff
+$ cd new-lg4ff
+# Follow the installation instructions in the repository
+```
+
+This module provides better support for Logitech racing wheels.
+
+## 4. Debug udev Rules (if needed)
+If you're still having issues with the driver not loading correctly, you may need to configure udev rules. Follow the debugging guide from Oversteer:
+
+See: https://github.com/berarma/oversteer
+
+## 5. Verify Device Detection
+Once you have the Logitech module loaded, check the event and joystick devices:
+```bash
+$ cat /proc/bus/input/devices | grep -iA4 logitech
+```
+This will show you the event device (e.g., `event25`) and joystick device (e.g., `js0`) assigned to your G29.
+
+## 6. Test Force Feedback and Joystick
+Before using this ROS package, verify that force feedback and joystick input work correctly:
+
+**Test force feedback:**
+```bash
+$ fftest /dev/input/eventX
+```
+Replace `eventX` with your device number from step 5. The test should show "OK" for force feedback capabilities.
+
+**Test joystick input:**
+```bash
+$ jstest /dev/input/jsY
+```
+Replace `jsY` with your joystick device number. You should see real-time updates of wheel position, pedals, and buttons.
+
+Once `fftest` shows OK for force feedback, you're ready to use this ROS package.
 
 # Install
 1. create ros2_ws
@@ -61,12 +118,22 @@ If you cannot get `CONFIG_LOGIWHEELS_FF=y`, try to find patch or use latest kern
     
 # Usage
 1. Get device name
+
+    If you followed the **Hardware Setup and Troubleshooting** section above, you should already know your event device (e.g., `event25`). If not, find it with:
+    ```bash
+    $ cat /proc/bus/input/devices | grep -iA4 logitech
+    ```
+    Look for the **Handlers** line showing the event device (e.g., `event25`).
+
+    Alternatively, you can list all input devices:
     ```bash
     $ cat /proc/bus/input/devices
     ```
-    find **Logitech G29 Driving Force Racing Wheel** and check Handlers (ex. event19)
+    Find **Logitech G29 Driving Force Racing Wheel** and check Handlers (ex. event19)
 
-2. Change `device_name` in config/g29.yaml to the device name you obtained in step 1
+2. Change `device_name` in `config/g29.yaml` to the event device you obtained in step 1
+
+    Update the line `device_name: "/dev/input/eventX"` where X is your event number (e.g., `/dev/input/event25`)
 
 3. Launch ros node
     ```bash

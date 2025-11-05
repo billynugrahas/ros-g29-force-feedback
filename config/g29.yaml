@@ -7,6 +7,9 @@ g29_force_feedback:
     # Device Configuration
     device_name: "/dev/input/event25"  # Linux input event device path (find with: cat /proc/bus/input/devices | grep -iA4 logitech)
 
+    # Topic Configuration
+    input_topic: "ff_target"  # Input topic for force feedback commands (relative name, will be prefixed by namespace)
+
     # Control Loop Timing
     loop_rate: 0.1  # Control loop period in seconds (0.1 = 10Hz). Lower = more responsive but higher CPU usage
 

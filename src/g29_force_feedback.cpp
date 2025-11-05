@@ -22,6 +22,7 @@ private:
 
     // rosparam
     std::string m_device_name;
+    std::string m_input_topic;
     double m_loop_rate;
     double m_max_torque;
     double m_min_torque;
@@ -59,12 +60,8 @@ private:
 G29ForceFeedback::G29ForceFeedback() 
     : Node("g29_force_feedback"){
         
-    sub_target = this->create_subscription<ros_g29_force_feedback::msg::ForceFeedback>(
-        "/ff_target", 
-        rclcpp::SystemDefaultsQoS(), 
-        std::bind(&G29ForceFeedback::targetCallback, this, std::placeholders::_1));
-    
     declare_parameter("device_name", m_device_name);
+    declare_parameter("input_topic", "ff_target");
     declare_parameter("loop_rate", m_loop_rate);
     declare_parameter("max_torque", m_max_torque);
     declare_parameter("min_torque", m_min_torque);
@@ -76,6 +73,7 @@ G29ForceFeedback::G29ForceFeedback()
     declare_parameter("auto_centering", m_auto_centering);
 
     get_parameter("device_name", m_device_name);
+    get_parameter("input_topic", m_input_topic);
     get_parameter("loop_rate", m_loop_rate);
     get_parameter("max_torque", m_max_torque);
     get_parameter("min_torque", m_min_torque);
@@ -85,6 +83,14 @@ G29ForceFeedback::G29ForceFeedback()
     get_parameter("auto_centering_max_position", m_auto_centering_max_position);
     get_parameter("eps", m_eps);
     get_parameter("auto_centering", m_auto_centering);
+
+    // Create subscription with parameterized topic name
+    sub_target = this->create_subscription<ros_g29_force_feedback::msg::ForceFeedback>(
+        m_input_topic,
+        rclcpp::SystemDefaultsQoS(),
+        std::bind(&G29ForceFeedback::targetCallback, this, std::placeholders::_1));
+
+    RCLCPP_INFO(this->get_logger(), "Subscribed to topic: %s", m_input_topic.c_str());
 
     initDevice();
 

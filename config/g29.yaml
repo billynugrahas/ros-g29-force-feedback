@@ -5,7 +5,7 @@ g29_force_feedback:
     # Example: position value 0.1 = 0.1 × 450° = 45°
 
     # Device Configuration
-    device_name: "/dev/input/event25"  # Linux input event device path (find with: cat /proc/bus/input/devices | grep -iA4 logitech)
+    device_name: "/dev/input/event15"  # Linux input event device path (find with: cat /proc/bus/input/devices | grep -iA4 logitech)
 
     # Topic Configuration
     input_topic: "ff_target"  # Input topic for force feedback commands (relative name, will be prefixed by namespace)

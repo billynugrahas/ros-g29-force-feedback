@@ -9,6 +9,8 @@ g29_force_feedback:
 
     # Topic Configuration
     input_topic: "ff_target"  # Input topic for force feedback commands (relative name, will be prefixed by namespace)
+    state_topic: "ff_state"   # Output topic for wheel state feedback (relative name, will be prefixed by namespace)
+    publish_state: true       # Enable/disable state publishing
 
     # Control Loop Timing
     loop_rate: 0.1  # Control loop period in seconds (0.1 = 10Hz). Lower = more responsive but higher CPU usage

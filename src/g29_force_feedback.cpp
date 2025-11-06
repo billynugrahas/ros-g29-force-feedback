@@ -9,12 +9,13 @@
 #include <math.h>
 
 #include "ros_g29_force_feedback/msg/force_feedback.hpp"
-// #include "ros_g29_force_feedback/msg/force_feedback.hpp"
+#include "ros_g29_force_feedback/msg/g29_state.hpp"
 
 class G29ForceFeedback : public rclcpp::Node {
 
 private:
     rclcpp::Subscription<ros_g29_force_feedback::msg::ForceFeedback>::SharedPtr sub_target;
+    rclcpp::Publisher<ros_g29_force_feedback::msg::G29State>::SharedPtr pub_state_;
     rclcpp::TimerBase::SharedPtr timer;
     // device info
     int m_device_handle;
@@ -25,6 +26,7 @@ private:
     // rosparam
     std::string m_device_name;
     std::string m_input_topic;
+    std::string m_state_topic;
     double m_loop_rate;
     double m_max_torque;
     double m_min_torque;
@@ -34,8 +36,10 @@ private:
     double m_auto_centering_max_position;
     double m_eps;
     bool m_auto_centering;
+    bool m_publish_state;
 
     // variables
+    std::string m_current_mode = "idle";
     ros_g29_force_feedback::msg::ForceFeedback m_target;
     bool m_is_target_updated = false;
     bool m_is_brake_range = false;
@@ -71,6 +75,8 @@ G29ForceFeedback::G29ForceFeedback()
         
     declare_parameter("device_name", m_device_name);
     declare_parameter("input_topic", "ff_target");
+    declare_parameter("state_topic", "ff_state");
+    declare_parameter("publish_state", true);
     declare_parameter("loop_rate", m_loop_rate);
     declare_parameter("max_torque", m_max_torque);
     declare_parameter("min_torque", m_min_torque);
@@ -83,6 +89,8 @@ G29ForceFeedback::G29ForceFeedback()
 
     get_parameter("device_name", m_device_name);
     get_parameter("input_topic", m_input_topic);
+    get_parameter("state_topic", m_state_topic);
+    get_parameter("publish_state", m_publish_state);
     get_parameter("loop_rate", m_loop_rate);
     get_parameter("max_torque", m_max_torque);
     get_parameter("min_torque", m_min_torque);
@@ -100,6 +108,14 @@ G29ForceFeedback::G29ForceFeedback()
         std::bind(&G29ForceFeedback::targetCallback, this, std::placeholders::_1));
 
     RCLCPP_INFO(this->get_logger(), "Subscribed to topic: %s", m_input_topic.c_str());
+
+    // Create state publisher if enabled
+    if (m_publish_state) {
+        pub_state_ = this->create_publisher<ros_g29_force_feedback::msg::G29State>(
+            m_state_topic,
+            rclcpp::SystemDefaultsQoS());
+        RCLCPP_INFO(this->get_logger(), "State publishing enabled on topic: %s", m_state_topic.c_str());
+    }
 
     initDevice();
 
@@ -348,6 +364,34 @@ void G29ForceFeedback::loop() {
     }
 
     uploadForce(m_target.position, m_torque, m_attack_length);
+    
+    // Determine current mode
+    if (m_auto_centering) {
+        m_current_mode = "centering";
+    } else if (m_is_brake_range) {
+        m_current_mode = "braking";
+    } else {
+        double diff = m_target.position - m_position;
+        if (fabs(diff) < m_eps) {
+            m_current_mode = "idle";
+        } else {
+            m_current_mode = "rotating";
+        }
+    }
+    
+    // Publish state if enabled
+    if (m_publish_state && pub_state_) {
+        auto state_msg = ros_g29_force_feedback::msg::G29State();
+        state_msg.header.stamp = this->now();
+        state_msg.header.frame_id = "g29_wheel";
+        state_msg.current_position = m_position;
+        state_msg.target_position = m_target.position;
+        state_msg.applied_torque = fabs(m_torque);
+        state_msg.mode = m_current_mode;
+        state_msg.device_connected = (m_device_handle >= 0);
+        
+        pub_state_->publish(state_msg);
+    }
 }
 
 

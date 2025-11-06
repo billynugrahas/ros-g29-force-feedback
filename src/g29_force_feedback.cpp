@@ -73,19 +73,19 @@ private:
 G29ForceFeedback::G29ForceFeedback() 
     : Node("g29_force_feedback"){
         
-    declare_parameter("device_name", m_device_name);
+    declare_parameter("device_name", "/dev/input/event25");
     declare_parameter("input_topic", "ff_target");
     declare_parameter("state_topic", "ff_state");
     declare_parameter("publish_state", true);
-    declare_parameter("loop_rate", m_loop_rate);
-    declare_parameter("max_torque", m_max_torque);
-    declare_parameter("min_torque", m_min_torque);
-    declare_parameter("brake_position", m_brake_position);
-    declare_parameter("brake_torque", m_brake_torque);
-    declare_parameter("auto_centering_max_torque", m_auto_centering_max_torque);
-    declare_parameter("auto_centering_max_position", m_auto_centering_max_position);
-    declare_parameter("eps", m_eps);
-    declare_parameter("auto_centering", m_auto_centering);
+    declare_parameter("loop_rate", 0.1);
+    declare_parameter("max_torque", 1.0);
+    declare_parameter("min_torque", 0.2);
+    declare_parameter("brake_position", 0.1);
+    declare_parameter("brake_torque", 0.2);
+    declare_parameter("auto_centering_max_torque", 0.3);
+    declare_parameter("auto_centering_max_position", 0.2);
+    declare_parameter("eps", 0.02);
+    declare_parameter("auto_centering", false);
 
     get_parameter("device_name", m_device_name);
     get_parameter("input_topic", m_input_topic);
